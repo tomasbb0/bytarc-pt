@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <!-- CasePreper: a C, with the answer dropped into its opening -->
+  <rect width="120" height="120" rx="27" fill="#123C3A"/>
+  <path d="M77.5 44.2A23 23 0 1 0 77.5 75.8" stroke="#F2E8D5" stroke-width="11" stroke-linecap="round"/>
+  <circle cx="79" cy="60" r="6.5" fill="#FFB547"/>
+</svg>
