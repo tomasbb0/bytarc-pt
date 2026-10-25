@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Bytarc Labs</title>
+<script>
+  // Keep the path, rename the old education project, then go to the matching Bytarc address.
+  (function () {
+    var path = location.pathname.replace(/^\/burnaylabs-site(\/|$)/, "/bytarclabs-site$1");
+    location.replace("https://bytarc.com" + path + location.search + location.hash);
+  })();
+</script>
+<meta http-equiv="refresh" content="0; url=https://bytarc.com/">
+<link rel="canonical" href="https://bytarc.com/">
+</head>
+<body>
+<p><a href="https://bytarc.com/">Bytarc Labs: bytarc.com</a></p>
+</body>
+</html>
