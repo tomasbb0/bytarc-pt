@@ -18,6 +18,7 @@ sed -i '' \
   -e 's|<html lang="en">|<html lang="pt">|' \
   -e 's|<link rel="canonical" href="https://bytarc.com/*">|<link rel="canonical" href="https://bytarc.pt/">|' \
   -e 's|<meta property="og:url" content="https://bytarc.com/">|<meta property="og:url" content="https://bytarc.pt/">|' \
+  -e 's#<title>Bytarc | AI Consulting &amp; Product Development</title>#<title>Bytarc | Consultoria em IA e Desenvolvimento de Produto</title>#' \
   "$here/index.html"
 cd "$here"
 git add -A
