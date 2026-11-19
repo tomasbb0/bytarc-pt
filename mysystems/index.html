@@ -1,0 +1,897 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Systems map · Tomás Batalha · BytArc</title>
+<meta name="description" content="An interactive map of every system Tomás Batalha has built at BytArc: agents, the JobAlfred platform, AI products, data models, client systems and tools.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#28282d">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png?v=5">
+<link rel="icon" href="/favicon.ico?v=5" sizes="48x48">
+<link rel="icon" href="/favicon.svg?v=6" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Pixel theme: the BytArc squares look. Ash background on a 12px grid, a black band of cells dripping from the top,
+   everything drawn in white and grey cells. No colour: areas are told apart by their pixel icons. */
+:root{--bg:#28282d;--line:#313137;--text:#F4F4F6;--t2:#B4B4BC;--t3:#80808A;--panel:#141417;--btn:#1c1c21;--edge:#000;
+ --disp:"Space Grotesk",ui-sans-serif,system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 var(--mono);-webkit-font-smoothing:antialiased;overflow:hidden;display:flex;flex-direction:column;height:100dvh}
+button{font:inherit;color:inherit}
+a{color:inherit}
+#bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+svg.px{display:block;shape-rendering:crispEdges}
+
+/* buttons: dark faces with a hard 3D edge, pressed into the edge on click */
+.pbtn{background:var(--btn);border:0;border-radius:0;box-shadow:4px 4px 0 var(--edge);cursor:pointer;color:var(--t2);transition:translate .06s,box-shadow .06s,color .2s,background-color .2s}
+.pbtn:hover{color:var(--text);background:#24242a}
+.pbtn:active{translate:4px 4px;box-shadow:0 0 0 var(--edge)}
+
+/* top bar */
+.bar{position:relative;z-index:5;display:flex;align-items:center;gap:18px;padding:14px 28px}
+.brand{display:inline-flex;align-items:center;gap:10px;font:600 17px/1 var(--disp);letter-spacing:-.02em;text-decoration:none}
+.brand img{width:28px;height:18px;display:block}
+.crumb{display:flex;align-items:center;gap:8px;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--t3);min-width:0}
+.crumb button{background:none;border:0;padding:0;cursor:pointer;color:var(--t2);text-transform:inherit;letter-spacing:inherit}
+.crumb button:hover{color:var(--text)}
+.crumb b{color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar nav{margin-left:auto;display:flex;gap:4px;font-size:13px;color:var(--t2)}
+.bar nav a{text-decoration:none;padding:8px 12px}.bar nav a:hover{color:var(--text)}
+.bar nav a[aria-current]{color:var(--text);background:rgba(255,255,255,.08)}
+
+main{position:relative;flex:1;min-height:0;z-index:2}
+.view{position:absolute;inset:0;display:flex;flex-direction:column;transition:opacity .5s ease,transform .7s cubic-bezier(.2,.75,.1,1)}
+.view[hidden]{display:none}
+#map.leave,#map.enter{opacity:0;pointer-events:none}
+#area.leave{opacity:0;transform:scale(.88);pointer-events:none}
+#area.enter{opacity:0;transform:scale(.92)}
+
+/* map: the pixels are drawn on the background canvas, these are the labels and the hit areas */
+.intro{text-align:center;padding:4px 20px 0}
+.kick{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--t3);margin:0}
+.kick i{font-style:normal;color:var(--text)}
+h1{font:600 clamp(28px,4.4vw,50px)/1.05 var(--disp);letter-spacing:-.035em;margin:8px 0 8px}
+.sub{font-size:12.5px;color:var(--t2);margin:0}
+.sub b{color:var(--text);font-weight:500}
+#stage{position:relative;flex:1;min-height:300px}
+.node,#core{position:absolute;width:0;height:0;padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.hit{position:absolute;left:calc(var(--d)/-2);top:calc(var(--d)/-2);width:var(--d);height:var(--d)}
+#core .hit{left:calc(var(--w)/-2);top:calc(var(--h)/-2);width:var(--w);height:var(--h)}
+.node:focus-visible,#core:focus-visible{outline:none}
+.node:focus-visible .hit,#core:focus-visible .hit{outline:2px solid #fff;outline-offset:6px}
+.lbl{position:absolute;left:0;top:calc(var(--d)/2 + 12px);transform:translateX(-50%);width:210px;text-align:center;pointer-events:none}
+.lbl strong{display:block;font:600 16px/1.2 var(--disp);letter-spacing:-.01em;color:var(--text);text-shadow:0 1px 0 #000}
+.lbl em{display:block;font-style:normal;font-size:11px;color:var(--t2);margin-top:3px}
+.node:hover .lbl strong{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
+#core .tag{position:absolute;left:0;top:calc(var(--cs)*2.4);transform:translateX(-50%);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--t2);white-space:nowrap;pointer-events:none}
+#core .lbl{top:calc(var(--h)/2 + 12px)}
+#core .lbl strong{white-space:nowrap;font:500 12.5px/1.2 var(--mono);color:var(--t2)}
+#core:hover .lbl strong{color:var(--text)}
+.mapfoot{text-align:center;font-size:11px;color:var(--t2);padding:6px 20px 14px;margin:0}
+.mapfoot i{display:inline-block;width:8px;height:8px;background:#fff;margin:0 6px 1px 0;vertical-align:middle}
+.mapfoot i.g{background:#78787f;margin-left:10px}
+
+/* area */
+.ahead{display:flex;align-items:center;gap:16px 22px;padding:2px 28px 0;flex-wrap:wrap}
+.back{flex:none;padding:9px 14px;font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+.atitle{display:flex;align-items:center;gap:16px;min-width:0}
+.aicon{flex:none;padding:6px;background:#000;box-shadow:4px 4px 0 rgba(0,0,0,.4)}
+.ameta{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--t2);margin:0}
+.atitle h2{font:600 clamp(26px,3.8vw,42px)/1.05 var(--disp);letter-spacing:-.035em;margin:4px 0 2px}
+.asub{font-size:12.5px;color:var(--t2);margin:0}
+.tabs{display:flex;gap:12px;overflow-x:auto;padding:14px 28px 8px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:none;display:inline-flex;align-items:center;gap:8px;padding:8px 12px;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.tabs button[aria-pressed=true]{background:#fff;color:#0a0a0d}
+.tabs button[aria-pressed=true] svg rect{fill:#0a0a0d}
+.scene{position:relative;flex:1;min-height:320px;perspective:1150px;touch-action:none;cursor:grab;overflow:hidden;user-select:none;-webkit-user-select:none}
+.scene.drag{cursor:grabbing}
+#ring{position:absolute;left:50%;top:48%;width:0;height:0;transform-style:preserve-3d}
+.shadow{position:absolute;left:50%;top:calc(48% + var(--ch)/2 + 16px);width:min(760px,95%);height:60px;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(0,0,0,.55),transparent);pointer-events:none}
+.card{position:absolute;left:0;top:0;width:var(--cw);height:var(--ch);margin:calc(var(--ch)/-2) 0 0 calc(var(--cw)/-2);padding:18px 18px 16px;overflow:hidden;
+ display:flex;flex-direction:column;cursor:pointer;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+ background-color:#0f0f12;background-image:linear-gradient(#17171b 1px,transparent 1px),linear-gradient(90deg,#17171b 1px,transparent 1px);background-size:12px 12px;
+ border:1px solid #3a3a42;box-shadow:8px 8px 0 #000;transition:border-color .3s}
+.card.front{border-color:#fff;box-shadow:8px 8px 0 #000,0 0 0 1px #fff}
+.card::after{content:"";position:absolute;left:0;right:0;top:0;height:24px;pointer-events:none;background:rgba(255,255,255,.05);opacity:0}
+.card.front::after{opacity:1;animation:scan 3s steps(26) infinite}
+@keyframes scan{from{transform:translateY(-24px)}to{transform:translateY(var(--ch))}}
+.ctop{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rk{display:inline-flex;align-items:center;gap:8px;font:500 12px/1 var(--mono);color:var(--t2);letter-spacing:.06em}
+.st{display:inline-flex;align-items:center;gap:6px;font:500 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;padding:5px 7px;background:#26262c;color:var(--t2)}
+.st.live{background:#fff;color:#0a0a0d}
+.st.live::before{content:"";width:6px;height:6px;background:#0a0a0d;animation:blink 1.2s steps(2) infinite}
+.st.archived{background:transparent;box-shadow:inset 0 0 0 1px #3a3a42;color:var(--t3)}
+@keyframes blink{50%{opacity:0}}
+.gl{width:100%;height:58px;margin:14px 0 12px}
+.card.front .gl .tw{animation:tw 2.4s steps(3) infinite}
+@keyframes tw{50%{opacity:.2}}
+.card h3{font:600 23px/1.15 var(--disp);letter-spacing:-.02em;margin:0 0 8px;color:var(--text)}
+.card p{font-size:12.5px;line-height:1.5;color:var(--t2);margin:0}
+.hero{margin-top:auto;padding-top:12px;border-top:1px dashed #3a3a42;font-size:12px;color:var(--text);display:flex;gap:8px;align-items:baseline}
+.hero::before{content:"";flex:none;width:7px;height:7px;background:#fff;transform:translateY(-1px)}
+.hero:empty{border:0;padding:0}
+.hero:empty::before{content:none}
+.open{margin-top:10px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#fff;opacity:0;transition:opacity .3s}
+.card.front .open{opacity:1}
+.ringnav{display:flex;align-items:center;justify-content:center;gap:16px;padding:0 20px 8px}
+.arrow{width:40px;height:40px;font-size:15px}
+#dots{display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:62vw}
+#dots button{width:8px;height:8px;padding:0;border:0;background:#55555d;cursor:pointer;transition:width .25s,background .25s;position:relative}
+#dots button::before{content:"";position:absolute;inset:-8px -2px}
+#dots button.on{width:22px;background:#fff}
+.hint{text-align:center;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--t2);margin:0;padding:4px 20px 16px}
+
+/* detail panel */
+#scrim{position:fixed;inset:0;z-index:8;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .3s}
+#scrim.on{opacity:1;pointer-events:auto}
+#detail{position:fixed;z-index:9;top:0;right:0;bottom:0;width:min(470px,100%);display:flex;flex-direction:column;
+ background-color:var(--panel);background-image:linear-gradient(#1a1a1e 1px,transparent 1px),linear-gradient(90deg,#1a1a1e 1px,transparent 1px);background-size:12px 12px;
+ border-left:2px solid #fff;transform:translateX(104%);transition:transform .45s cubic-bezier(.2,.8,.2,1);box-shadow:-16px 0 0 rgba(0,0,0,.35)}
+#detail.show{transform:none}
+.dhead{display:flex;justify-content:space-between;align-items:center;padding:18px 22px 0}
+.dcat{display:inline-flex;align-items:center;gap:10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--t2)}
+.x{width:36px;height:36px}
+.dbody{flex:1;overflow-y:auto;padding:10px 22px 10px;overscroll-behavior:contain}
+.drank{font-size:11.5px;color:var(--t3);letter-spacing:.1em}
+.dbody h2{font:600 30px/1.08 var(--disp);letter-spacing:-.03em;margin:6px 0 8px}
+.dtag{font-size:13.5px;color:var(--t2);margin:0 0 14px}
+.dmeta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.dhero{font-size:11.5px;color:var(--text);padding:4px 8px;box-shadow:inset 0 0 0 1px #55555d}
+.dbody section{margin-top:22px}
+.dbody h4{display:flex;align-items:center;gap:8px;font:500 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:#fff;margin:0 0 9px}
+.dbody h4::before{content:"";width:8px;height:8px;background:#fff}
+.dbody section p{font:400 14.5px/1.6 var(--disp);color:#D6D6DC;margin:0}
+.dbody ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.dbody li{font:500 14px/1.5 var(--disp);color:var(--text);padding:10px 12px;background:#1f1f24;border-left:4px solid #fff}
+.dlinks{display:flex;flex-wrap:wrap;gap:14px;margin-top:24px}
+.dlinks a{font-size:12px;text-decoration:none;padding:10px 14px;background:#fff;color:#0a0a0d;font-weight:500;box-shadow:4px 4px 0 #000;transition:translate .06s,box-shadow .06s}
+.dlinks a+a{background:var(--btn);color:var(--text)}
+.dlinks a:active{translate:4px 4px;box-shadow:0 0 0 #000}
+.dlinks span{font-size:12px;color:var(--t3);padding:9px 0}
+.dnote{font-size:11px;color:var(--t3);margin:26px 0 6px}
+.dnav{display:flex;justify-content:space-between;align-items:center;padding:14px 22px calc(16px + env(safe-area-inset-bottom));border-top:1px solid #2a2a30;background:var(--panel)}
+.dnav button{padding:9px 13px;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.dnav span{font-size:11.5px;color:var(--t3)}
+
+@media (max-width:700px){
+ .bar{padding:12px 16px}
+ .bar nav{display:none}
+ .lbl{width:118px;top:calc(var(--d)/2 + 8px)}
+ .lbl strong{font-size:12.5px}
+ .lbl em{display:none}
+ #core .tag{font-size:7.5px;letter-spacing:.14em}
+ #core .lbl strong{font-size:11px}
+ .ahead{padding:0 16px;gap:10px 14px}
+ .aicon{padding:4px}
+ .tabs{padding:12px 16px 8px}
+ .card{padding:16px 15px 14px}
+ .card h3{font-size:19px}
+ .gl{height:44px;margin:10px 0}
+ #detail{top:auto;width:100%;height:86dvh;border-left:0;border-top:2px solid #fff;transform:translateY(104%)}
+ .dbody h2{font-size:26px}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition-duration:.01s!important}}
+</style>
+</head>
+<body>
+<canvas id="bg" aria-hidden="true"></canvas>
+<header class="bar">
+  <a class="brand" href="/"><img src="/assets/bytarc-mark-white.svg" alt="BytArc logo" width="28" height="18">BytArc</a>
+  <div class="crumb" id="crumb"></div>
+  <nav aria-label="Pages"><a href="/">Home</a><a href="/about/">About</a><a href="/products/">Products</a><a href="/tomas-batalha/">Founder</a><a href="/mysystems/" aria-current="page">Systems</a></nav>
+</header>
+<main>
+  <section id="map" class="view" aria-label="Systems map">
+    <div class="intro">
+      <p class="kick"><i>■</i> systems map</p>
+      <h1>Every system I've built</h1>
+      <p class="sub" id="sub"></p>
+    </div>
+    <div id="stage"></div>
+    <p class="mapfoot"><i></i>live system<i class="g"></i>prototype or archived</p>
+  </section>
+  <section id="area" class="view" aria-label="Systems in this area" hidden>
+    <div class="ahead">
+      <button class="back pbtn" id="back">← Map</button>
+      <div class="atitle"><span class="aicon" id="aicon"></span><div><p class="ameta" id="ameta"></p><h2 id="atitle"></h2><p class="asub" id="asub"></p></div></div>
+    </div>
+    <div class="tabs" id="tabs" role="group" aria-label="Areas"></div>
+    <div class="scene" id="scene"><div class="shadow"></div><div id="ring"></div></div>
+    <div class="ringnav"><button class="arrow pbtn" id="prev" aria-label="Previous system">←</button><div id="dots"></div><button class="arrow pbtn" id="next" aria-label="Next system">→</button></div>
+    <p class="hint" id="hint"></p>
+  </section>
+</main>
+<div id="scrim"></div>
+<aside id="detail" aria-hidden="true" aria-label="System details">
+  <div class="dhead"><span class="dcat" id="dcat"></span><button class="x pbtn" id="dclose" aria-label="Close">✕</button></div>
+  <div class="dbody" id="dbody"></div>
+  <div class="dnav"><button class="pbtn" id="dprev">← Prev</button><span id="dpos"></span><button class="pbtn" id="dnext">Next →</button></div>
+</aside>
+<noscript><p style="position:fixed;inset:auto 0 40% 0;text-align:center">This map needs JavaScript.</p></noscript>
+<script>
+const CATS=[
+ ["agents","Agents & automation","Agents that work for me"],
+ ["jobalfred","JobAlfred platform","The job-search platform"],
+ ["products","AI products","Apps people use"],
+ ["data","Data & analysis","Models that decide"],
+ ["client","Client systems","Built for clients and employers"],
+ ["tools","Tools & internal","My own toolbelt"]
+];
+/* 9x9 pixel icons: # white, + grey */
+const ICONS={
+ agents:["....#....","....#....",".#######.",".#.....#.",".#.#.#.#.",".#.....#.",".#.+++.#.",".#######.","..#...#.."],
+ jobalfred:["...###...","...#.#...","#########","#.......#","#.......#","####+####","#.......#","#.......#","#########"],
+ products:["....#....","...###...","...#+#...","...###...","..#####..","..#####..",".##.#.##.",".#..#..#.","....+...."],
+ data:[".......#.",".......#.","....#..#.","....#..#.",".#..#..#.",".#..#..#.",".#..#..#.",".#..#..#.","#########"],
+ client:[".##...##.",".##...##.",".........","####.####","####.####","####.####","####.####",".........","+++++++++"],
+ tools:["...#.#...",".#######.",".##...##.","###.+.###",".#.+++.#.","###.+.###",".##...##.",".#######.","...#.#..."],
+ top:["....#....","...###...","#########",".#######.","..#####..","..#####..",".###.###.",".##...##.","#.......#"]
+};
+const DIGITS={0:["###","#.#","#.#","#.#","###"],1:[".#.","##.",".#.",".#.","###"],2:["###","..#","###","#..","###"],3:["###","..#","###","..#","###"],4:["#.#","#.#","###","..#","..#"],
+ 5:["###","#..","###","..#","###"],6:["###","#..","###","#.#","###"],7:["###","..#","..#",".#.",".#."],8:["###","#.#","###","#.#","###"],9:["###","#.#","###","..#","###"]};
+const S=[
+{c:"jobalfred",n:"JobAlfred · AI Apply Copilot",t:"Chrome extension that fills job applications on any ATS",h:"5.0 stars · 8 reviews",
+ s:"live",
+ g:"Fill job applications on any applicant-tracking system from your CV, write cover letters and answers with AI, and track everything. The user checks every answer and presses Submit.",
+ a:"Manifest V3 extension in plain JavaScript: field detection and filling engine, a dedicated Workday module, cover-letter generator, job scraper and tracker, Google OAuth with Drive sync. AI on the user's own OpenAI, Anthropic or Google key. v4 adds signed site-rule bundles, a community personalities store and Find Jobs on the JobAlfred index.",
+ r:["5.0 rating from 8 Chrome Web Store reviews","€0 spent on marketing"],
+ l:[["Chrome Web Store","https://chromewebstore.google.com/detail/kbmpbhhhdojgjnpfpnoehafmllfejgll"],["jobalfred.com","https://jobalfred.com"]]},
+{c:"agents",n:"Job Hunt Autopilot",t:"Runs my whole job search, from Gmail to follow-ups",h:"1,006 runs a week · 0.1% failed",
+ s:"live",
+ g:"Runs my whole job search on autopilot: reads Gmail every 30 minutes to update the application tracker, sweeps job boards weekly, finds contacts, drafts follow-ups and only sends them after I approve.",
+ a:"Self-hosted n8n on one small AWS server (t3.small, 2 GB). 7 workflows and 132 nodes: Gmail sync, weekly sweep with liveness checks, tracker enrichment (Hunter.io), follow-up sender, plus an MCP server and GPT Actions API so I can query and drive it from ChatGPT or any AI chat. gpt-4o-mini at temperature 0 with JSON output, acting only above 0.7 confidence. Google Sheets as the ledger, with a self-testing send gate and zero-output alerts.",
+ r:["1,006 production runs in the 7 days to 18 Nov 2026, 1 failed (0.1%), 11.2 s average run","In production since September 2026","New send gate checked against 3,000 randomised runs: same decisions as the old one"],
+ l:[["Click-through demo","/demo/"],["Talk slides (AI Builders Lisbon)","/aibuilderslides/"],["Demo video","/aibuildersvideodemo/"]]},
+{c:"agents",n:"OpenClaw Secretary",t:"Answers my calls and books plans with my friends",h:"",
+ s:"prototype",
+ g:"My personal secretary: answers and makes phone calls for me, talks to all my other agents, and books plans with my friends on my behalf.",
+ a:"Real phone line through SignalWire telephony, with the Gemini Live API handling the voice conversation in real time, bridged by a Node service over webhooks. Part of the OpenClaw agent team, so it can hand work to and pull answers from the other agents. Improves itself through a Codex worker that pushes new code.",
+ r:[], l:[]},
+{c:"agents",n:"Web Summit Brain",t:"AI ranks who I should meet at Web Summit",h:"Shipped in 2 days",
+ s:"live",
+ g:"Find the right people to meet at Web Summit Lisbon 2026: search attendees and investor research, then let AI rank who matters for a given goal.",
+ a:"Static page with the whole dataset AES-256-GCM encrypted in the browser bundle (PBKDF2, 310k iterations), built by a Python script so raw data never leaves my Mac. Search runs locally; \"Ask AI\" works with any provider key (Anthropic, OpenAI, Gemini, OpenRouter, Groq, xAI, Mistral): one call turns the question into filters, then the top 60 matches are ranked.",
+ r:["Built and shipped in 2 days for Web Summit 2026"],
+ l:[["Open (password protected)","/websummit/"]]},
+{c:"jobalfred",n:"Job Radar · 1.5M live jobs",t:"Daily index of jobs straight from employers' own systems",h:"1,568,009 open roles",
+ s:"live",
+ g:"A free, daily index of open jobs taken straight from employers' own hiring systems, so job seekers don't depend on aggregators.",
+ a:"Python crawler with adapters for about 15 applicant-tracking systems (Greenhouse, Lever, Ashby, Workday, Workable, Recruitee…) plus big-company and open feeds. Finds employers through Common Crawl, certificate logs and VC portfolio pages. Respects robots.txt as JobAlfredBot, writes gzip JSON shards per country, runs nightly on GitHub Actions and labels industry, seniority and funding.",
+ r:["1,568,009 open roles indexed (6 Nov 2026)","European VC-backed set: 25,859 roles from 2,096 companies; role counts match the live boards 93.0% (Europe) and 97.2% (world)","76.9% job-weighted coverage on a 200-company sample"],
+ l:[["Bot page","https://jobalfred.com/bot"]]},
+{c:"agents",n:"Agentic Job Sweep",t:"Agents scanned 62K postings and applied to the best",h:"95 applications submitted",s:"archived",
+ g:"Collect every fitting AI-centred role across Lisbon and the EU, prepare tailored materials and apply to the best ones.",
+ a:"Scrapers over public ATS APIs and job boards, form reading, a tailored CV and drafted answers per role, then browser agents applying from batch files under a written brief, all rendered into one tracking page.",
+ r:["62,192 postings scanned across 1,573 boards","585 roles shortlisted, 180 tailored CVs","95 applications submitted"],
+ l:[]},
+{c:"agents",n:"Agent Mission Control",t:"One control room for all my AI agents",h:"",
+ s:"prototype",
+ g:"One control room for the AI agents that run parts of BytArc's operations: what each agent is doing, its tasks, automations and health.",
+ a:"Next.js dashboard on Supabase showing agents, tasks, automations, activity and health, polling each agent's status. Watches every OpenClaw agent, including the Secretary and the research agent, which auto-improve through a Codex worker that pushes code.",
+ r:[],
+ l:[["Code","https://github.com/tomasbb0/openclaw-mission-control"]]},
+{c:"data",n:"Market Entry Copilot",t:"Messy case pack in, market recommendation out",h:"13 files in under 1 s · 28/28",
+ s:"live",
+ g:"Turn a messy case pack of documents into a validated dataset, an evidence report, a ranked market recommendation, a five-year Excel model and a deck.",
+ a:"Seven-stage Python pipeline: PDF, Excel, HTML and CSV readers, rule-based extraction with a schema-validated, cached LLM fallback (Anthropic, temperature 0), deduplication, reconciliation and arithmetic checks. Local web app, Docker deploy and a public showcase with a grounded chat.",
+ r:["13 files in 4 formats processed in under one second","28/28 on its extraction test set","3,236 raw records deduplicated to 228 real units, with 0 LLM calls (€0)"],
+ l:[["Open","/market-runway/"],["Code","https://github.com/tomasbb0/market-runway"]]},
+{c:"agents",n:"AI Lead Research Pipeline",t:"Researches leads and drafts first emails with AI",h:"€147K pipeline from zero",s:"archived",
+ g:"Automate prospect research, lead lists and first emails at Pairwire, so the founder's time goes to calls.",
+ a:"Python pipeline pulling leads from Apollo and Expand.io, enriching and grouping them with time-zone logic, and drafting first emails with the OpenAI API, with a human review before every send.",
+ r:["7,000+ leads processed","About 80% of prospecting automated","€147K pipeline in 11 months, from zero"],
+ l:[]},
+{c:"agents",n:"Alumni Matchmaker",t:"An agent that proposes which alumni should meet",h:"",
+ s:"live",
+ g:"A community platform for Nova SBE alumni in New York, with an always-on agent that proposes who should meet whom.",
+ a:"Next.js 16 static export with Supabase (profiles, connections, events), Cloudflare Pages Functions for an onboarding chat, and a scheduled agent (GitHub Actions cron, optional VPS timer) that reads profiles and writes proposed connections. Landing, RSVP, survey, directory, jobs and events.",
+ r:[],
+ l:[["Open","https://demo.bytarc.com/"]]},
+{c:"client",n:"Answer-Engine Audit",t:"Checks if ChatGPT and AI search can find and cite a brand",h:"35 signals · 11 AI crawlers",s:"archived",
+ g:"Show a national retail brand's management why AI engines (ChatGPT, AI Overviews, Perplexity) rarely recommend it, and give them a 12-month plan to fix it.",
+ a:"Live audit of the brand's Shopify site: robots.txt, llms.txt and structured-data checks, live fetches as 11 AI and search crawlers, knowledge-graph and review-site checks, and a 35-signal readiness scorecard, turned into a sourced 34-slide deck with a five-engine share-of-answer test design.",
+ r:["35-signal readiness scorecard","11 AI and search crawler user-agents tested live","34-slide deck with a 12-month roadmap (Sep 2026)"],
+ l:[]},
+{c:"client",n:"AI-Readiness Audit Copilot",t:"Runs AI-readiness audits and publishes them to clients",h:"30-criterion scoring framework",s:"live",
+ g:"Let a Lisbon consultancy create, re-run and edit AI-readiness audits for client brands, and grow a knowledge base from research and podcasts.",
+ a:"Claude skill driving a Supabase-backed audit platform on the consultancy's site (SQL functions that open audits and recalculate scores), with a 30-criterion framework, client fact sheets, and knowledge and podcast briefs rendered to branded PDFs with headless Chrome.",
+ r:["30 scoring criteria (framework version 10)"],
+ l:[]},
+{c:"client",n:"Ad Profit Radar (Google)",t:"Showed where big advertisers' spend stopped paying back",h:"$1.41M projected savings",s:"archived",
+ g:"Show partner managers where Iberia's largest advertisers were spending on media that no longer paid back.",
+ a:"3 automated dashboards on Google Apps Script and Google Marketing Platform data, comparing ROAS with profit and CPA with conversions. Built during my Google internship.",
+ r:["3 dashboards, built to scale globally","$1.41M projected annual media-spend savings"],
+ l:[]},
+{c:"client",n:"Account Scoring Engine (Amazon)",t:"Scored every B2B account to find who would actually spend",h:"21x the KPI benchmark",s:"archived",
+ g:"Get new Amazon Business accounts in Portugal to start spending by working the highest-potential ones first.",
+ a:"Scoring model on company revenue plus Salesforce signals (platform activity, procurement-heavy industry, headcount), a top-down call plan and a team tracking dashboard. Built during my Amazon internship.",
+ r:["Portfolio of 2,311 accounts in a new market","21x the account-configuration KPI benchmark (an experimental target)"],
+ l:[]},
+{c:"client",n:"Artist Money Ledger",t:"Expense ledger for a music agency's artists",h:"In use by the client",
+ s:"live",
+ g:"Log expenses per artist and project, settle them between the agency and outside investors, and export to Excel and PDF.",
+ a:"Web app in vanilla JS with Google Apps Script syncing into one Google Sheet per artist. Requirements gathered from the client's voice notes, transcribed with Whisper.",
+ r:["Delivered and in use by the client"], l:[]},
+{c:"jobalfred",n:"Alfred Meeting Copilot",t:"Live tips during calls, plus a debrief after",h:"",s:"prototype",
+ g:"Listen to a video call, know which voice is mine, show one useful tip at a time, and write notes, commitments and a follow-up afterwards; also runs interview practice.",
+ a:"Electron desktop app on a shared engine package: system-audio capture, speech to text, coaching from playbooks with OpenAI, read-only Calendar and Gmail context, and an on-device profile memory. English, Portuguese and Spanish.",
+ r:[],
+ l:[]},
+{c:"products",n:"Tutor OS",t:"Tutoring platform with 12 learning games",h:"In real use with students",
+ s:"live",
+ g:"A tutoring platform for my own students: teacher dashboard, per-student lesson pages and learning games.",
+ a:"Static HTML/JS on Firebase (Auth, Firestore with security rules, Hosting), 12 interactive games sharing one game engine, and per-student setup scripts. A hardening branch migrates logins to Firebase Auth with lockdown rules.",
+ r:["In real use with my tutoring students"], l:[["Open","/bytarclabs-site/"]]},
+{c:"client",n:"Partner Reporting Platform (Google)",t:"One reporting tool for partner managers",h:"€315K estimated gains",s:"archived",
+ g:"Replace fragmented partner reporting with one tool tied to the decisions partner managers actually make.",
+ a:"Looker Studio and Analytics 360 with Apps Script automation, including a shortcut for adding partners and a partner dashboard linked to revenue.",
+ r:["€315K estimated annual efficiency gains"],
+ l:[]},
+{c:"client",n:"Enterprise Pilot Kit",t:"Pilot guides and decision decks that close enterprise deals",h:"Signed a paid enterprise pilot",s:"archived",
+ g:"Turn interested enterprise prospects into signed, low-risk paid pilots.",
+ a:"Reusable onboarding and assessment guides per prospect, plus a decision deck for the client's internal champion: status quo against alternatives, time and money saved, security answers, pilot scope and timing.",
+ r:["Signed paid pilot with a European outlet-centre group","Kit reused across 15 prospect folders"],
+ l:[]},
+{c:"client",n:"Team Pulse Panel",t:"Who did what and what needs approval, inside Claude",h:"",s:"live",
+ g:"Give a non-technical consulting team one shared view of each person's work, change requests and website approvals.",
+ a:"Claude skill plus a Claude artifact with its own database (members, projects, work blocks, approval items) that the team reads and writes through Claude, with a guided review and diff checker for website changes.",
+ r:[],
+ l:[]},
+{c:"products",n:"CV Tailor AI (TopResume.ai)",t:"Write and tailor a CV with live AI help",h:"",
+ s:"live",
+ g:"Write, edit and tailor a CV with live AI help and export a one-page A4 PDF.",
+ a:"Single-page app with Firebase auth and storage and a multi-provider AI layer (local Ollama, Groq, Cerebras, OpenRouter, Gemini, OpenAI, Claude) with an agent mode that applies edits directly.",
+ r:[], l:[["Open","/cv-platform/"]]},
+{c:"client",n:"Review Radar (ALLREV.AI)",t:"Every Google review of a brand's stores in one view",h:"",
+ s:"prototype",
+ g:"Type a brand, find all its physical stores and merge every Google review into one view for retail analysis.",
+ a:"React 19 + Vite front end with Gemini and Maps grounding, Node backend on Render using the Google Places API and a headless Chromium scraper.",
+ r:[], l:[]},
+{c:"client",n:"Invoice Inbox Reconciler",t:"Supplier invoices from email to the sheet, mismatches flagged",h:"Paid pilot · client runs it alone",s:"live",
+ g:"Stop a music agency's finance lead typing supplier invoices by hand and checking them against payments every week.",
+ a:"n8n flow pulls each invoice from the inbox, an LLM reads supplier, date and amount, the row lands in the existing Google Sheet, and anything that does not match is flagged for her approval.",
+ r:["Paid pilot, handed over; the finance lead now runs it on her own"],
+ l:[]},
+{c:"tools",n:"Agent Swarm Runner (TaskSync)",t:"Run many AI coding agents in parallel",h:"",
+ s:"prototype",
+ g:"Run several AI coding agents in parallel, each with its own terminal, task queue and autopilot loop.",
+ a:"Electron + Vite + TypeScript desktop app with node-pty terminals and a global hotkey, plus two VS Code extensions linked through shared state and a URL scheme.",
+ r:[], l:[]},
+{c:"data",n:"VC Startup Jobs Index",t:"Every open role at VC-backed startups",h:"45,526 roles · 3,313 companies",s:"live",
+ g:"List open roles at venture-backed startups, read straight from their own careers systems.",
+ a:"Python index with ATS adapters, a headquarters reader that parses each company's own site, funding tags from public news, a not-a-startup filter, headless-Chrome discovery, and a weekly GitHub Actions refresh into gzip JSON releases.",
+ r:["World file: 45,526 roles from 3,313 companies","Europe file: 25,859 roles from 2,096 companies","Headquarters detection hand check: 38 of 40 correct"],
+ l:[["GitHub","https://github.com/BytArc/jobalfred-index"]]},
+{c:"agents",n:"Company Brain",t:"AI interviewer that maps how a company really works",h:"",
+ s:"prototype",
+ g:"An AI interviewer that maps how a company really works, starting from the CEO and cascading down reporting lines, so AI can be implemented on top of real workflows.",
+ a:"Static front end calling a Cloudflare Worker API; builds an \"operating graph\" of people, workflows and platforms, with an evidence and AI-governance view.",
+ r:[], l:[["Open","/company-brain/"]]},
+{c:"client",n:"Agency Ops Hub",t:"One login hub for a music agency's internal tools",h:"",s:"live",
+ g:"Give a music agency's team one place to open its internal platforms, with per-user access and a way to request new ones.",
+ a:"Static hub with desktop and mobile versions, platform cards (expenses, users, projects), per-user access control, and Google Apps Script syncing users, access and per-artist summaries into Google Sheets.",
+ r:[],
+ l:[]},
+{c:"client",n:"Synthetic Shopper Personas",t:"AI customers built from survey data and reviews",h:"Used by 6 executive groups",s:"archived",
+ g:"Give executive-course groups AI shoppers they can interview and walk through a retail brand's customer journey.",
+ a:"Persona prompts that build each shopper step by step from the brand's own description and a 15-question branding survey, combined with an analysis of the brand's Google reviews that found the main causes of low ratings.",
+ r:["Used with 6 groups of 5 in a 2025 executive education course"],
+ l:[]},
+{c:"client",n:"Brand Deck Generator",t:"Client decks in a consultancy's brand, generated",h:"",s:"live",
+ g:"Produce a consultancy's client action plans, audits and proposals as PowerPoint files in its house design, without hand-formatting.",
+ a:"Claude skill and plugin with fixed design tokens, page templates, bundled brand assets and a pptxgenjs starter that outputs 16:9 .pptx files.",
+ r:[],
+ l:[]},
+{c:"client",n:"Exec-Ed Course Copilot",t:"Builds an executive course's sessions and slides",h:"",s:"live",
+ g:"Rebuild a business school's digital-strategy executive module (customer experience, journey, digital ecosystem) for its 2026 edition and produce its decks.",
+ a:"Two Claude skills: a course knowledge base (the 2025 decks studied slide by slide, briefing, 2026 programme, reuse map) and a deck design system that outputs .pptx with pptxgenjs.",
+ r:[],
+ l:[]},
+{c:"jobalfred",n:"JobAlfred Credit Engine",t:"Pay-as-you-go AI credits for JobAlfred",h:"",
+ s:"pre-launch",
+ g:"An optional paid tier: autofill stays free, paying users get server-side AI (screening answers, tailored CVs, job matching) without bringing their own key.",
+ a:"TypeScript Cloudflare Worker with D1 and Durable Objects for credit wallets, Google sign-in, Stripe checkout and webhooks, Claude via AWS Bedrock EU or the Anthropic API plus Gemma on Workers AI. Tested with Vitest.",
+ r:[], l:[]},
+{c:"agents",n:"Autonomous SDR Agent (VendasIA)",t:"Personalised B2B outreach in Portuguese, at scale",h:"",
+ s:"prototype",
+ g:"Write personalised B2B outreach in European Portuguese at scale for Portuguese companies.",
+ a:"Python pipeline using Gemini 2.0 Flash for message writing, with Groq, Tavily research and Gmail SMTP, a Make.com blueprint and CSV tracking. Ships with an M&A deal CRM built as a Google Sheets add-on.",
+ r:[], l:[]},
+{c:"jobalfred",n:"Fair Match Engine",t:"Fair, explainable candidate-to-role matching",h:"18 tests incl. name-swap fairness",
+ s:"prototype",
+ g:"Test bench for a two-sided matching engine that proposes fair, explainable candidate-to-role matches each week.",
+ a:"Dependency-free TypeScript pipeline: hard filters, blinding of personal attributes, retrieval (bge-m3 or TF-IDF), a rubric whose quotes are checked verbatim, scoring, capped allocation and Bayesian learning, with Gemma on Workers AI. 18 tests including a name-swap fairness test.",
+ r:[], l:[]},
+{c:"agents",n:"Follow-up Manager Agent",t:"Keeps every job-search conversation moving",h:"",s:"live",
+ g:"Every day, read the job-search sheet, check replies and keep each thread's next step on track, without sending anything.",
+ a:"Scheduled Codex agents (a daily follow-up manager and a Gmail live tracker) working on a strict follow-ups sheet and calling the Job Hunt Autopilot's MCP tools, with dry-run and never-send rules.",
+ r:[],
+ l:[]},
+{c:"data",n:"Founder Compass",t:"Decision model for which business to start",h:"23 ideas · 50 niches ranked",
+ s:"prototype",
+ g:"A decision model for founders: which business to start, and when to stay or pivot.",
+ a:"Python model that runs OpenAI Deep Research searches, caches them, and feeds a weighted formula with gates and evidence scores to write decision reports.",
+ r:["Ranked 23 business ideas in a first round, then sized 50 niches in a second"], l:[]},
+{c:"jobalfred",n:"Country Job Pages",t:"A job-search page per country, built from the index",h:"",s:"live",
+ g:"Publish a searchable page per country and focused lists (Remote EU, EU visa sponsorship, India) on jobalfred.com.",
+ a:"Python static-site build from the job index shards and the jobs repo, with a pre-publish check gate, served as a static Cloudflare Worker with no server code.",
+ r:[],
+ l:[["jobalfred.com","https://jobalfred.com"]]},
+{c:"agents",n:"Founder Interviewer",t:"Interviews a founder and writes the dossier",h:"",
+ s:"prototype",
+ g:"Interview a founder through 18 structured sections and turn the conversation into a PDF dossier.",
+ a:"Two builds: a Node/Express server (OpenAI, PDFKit, Nodemailer) and a static version on bytarc.com whose chat runs through a Google Apps Script proxy that holds the key. Voice input and in-browser PDF generation.",
+ r:[], l:[["Open (password protected)","/founderos/"]]},
+{c:"client",n:"Tourism Project Brain",t:"Memory and document engine for a national tourism project",h:"",s:"live",
+ g:"Keep a national literary-tourism project (tour points, filming status, site texts, schedule, decisions) queryable and produce its documents.",
+ a:"Claude skill with structured references (points, site and audio-guide text model, decisions, next-phase ideas) plus Python scripts that summarise the tour points.",
+ r:[],
+ l:[]},
+{c:"jobalfred",n:"JobAlfred inside ChatGPT",t:"Real job search inside ChatGPT, over MCP",h:"",
+ s:"prototype",
+ g:"Let ChatGPT users search, verify and read real job postings, and point them to the extension.",
+ a:"Read-only MCP server on the official TypeScript SDK over Streamable HTTP, with find_jobs, verify_job and job_details tools. Runs on Deno Deploy; a Cloudflare Workers port reads the job index from KV.",
+ r:[], l:[]},
+{c:"tools",n:"Floating Notes",t:"Always-on-top Mac notes, synced live to my phone",h:"",
+ s:"live",
+ g:"Always-on-top floating notes for macOS that never steal focus, with tasks, groups and tear-out tabs, synced live with a web version on my phone.",
+ a:"Electron app using non-activating panels, plus a web build from the same source. Sync through a GitHub Gist polled every 4 seconds with ETags, merged per tab; notes to tasks with OpenAI; iOS widget.",
+ r:[], l:[["Open the web version","/notes-app/"]]},
+{c:"tools",n:"Voice-following Teleprompter",t:"A teleprompter that scrolls as I speak",h:"",s:"live",
+ g:"Keep a floating script in sync with what I am saying during calls and recordings.",
+ a:"Speech-to-script aligner (word normalisation, stop words, fuzzy matching, EN and PT) on OpenAI realtime transcription, inside the Floating Notes window.",
+ r:[],
+ l:[["Code","https://github.com/tomasbb0/notes-app"]]},
+{c:"tools",n:"Promo Film Pipeline",t:"Product films rendered from code",h:"",s:"prototype",
+ g:"Produce product promo films from real captures of the build, with music and voiceover, without a video editor.",
+ a:"Remotion (React) compositions fed by Python capture scripts, generated music, ElevenLabs voiceover mixing, and automated motion, sync and OCR checks.",
+ r:[],
+ l:[]},
+{c:"jobalfred",n:"JobAlfred CV Builder",t:"AI proposes CV edits per job, you accept or deny",h:"",s:"prototype",
+ g:"Tailor a CV to a job through reviewable edit cards instead of a full rewrite.",
+ a:"Offline-first web prototype with an A4 editor and an assistant panel; runs demo rules with no AI by default, with an optional local Ollama mode.",
+ r:[],
+ l:[]},
+{c:"agents",n:"Startup Roles Scout",t:"Scheduled agent that scouts startup roles",h:"",s:"live",
+ g:"Find new strategy, operations and founding-GTM roles at startups in Europe and Lisbon and log them by priority.",
+ a:"Codex cron agent using a signed-in Chrome session (it skips itself if Chrome is closed), plus weekly sweeps of ATS boards and startup job sites feeding a Google Sheet queue.",
+ r:[],
+ l:[]},
+{c:"jobalfred",n:"JobAlfred Community Hub",t:"Backend for JobAlfred's community store",h:"",
+ s:"live",
+ g:"Backend for the extension's community store (publish, browse, upvote, report), remote config, signed site rules and a free AI answer endpoint.",
+ a:"Cloudflare Worker with D1 in the EU jurisdiction, ported from Deno Deploy. Installs are identified only by a salted hash of a random ID; free AI on Workers AI with moderation.",
+ r:[], l:[]},
+{c:"jobalfred",n:"Open Job Feeds",t:"Free daily job lists, open on GitHub",h:"2,449 open roles on 18 Nov",
+ s:"live",
+ g:"Free, daily-refreshed lists of open roles (Portugal, Remote EU, EU visa sponsorship, India roles at global companies), as a public good and an acquisition channel.",
+ a:"Python job reading only the official Greenhouse, Lever and Ashby APIs, with a classifier per list; GitHub Actions refresh writes Markdown tables and JSON. Code MIT, data CC BY 4.0.",
+ r:["18 Nov 2026: 1,081 India roles, 1,012 Remote EU, 321 Portugal, 35 EU with visa sponsorship"],
+ l:[["GitHub","https://github.com/BytArc/jobalfred-jobs"]]},
+{c:"jobalfred",n:"ATS Form Atlas",t:"Open map of what job forms ask on each ATS",h:"77 hiring systems mapped",
+ s:"prototype",
+ g:"An open map of what job application forms ask on each applicant-tracking system, for builders and researchers.",
+ a:"JSON and CSV data with Python tools to build, validate and explore it, derived from the extension's rules and saved public form pages with employer data stripped.",
+ r:["77 hiring systems mapped from 175 saved form pages"], l:[]},
+{c:"products",n:"LifeOrganizer",t:"A personal CRM built from my own messages",h:"",s:"prototype",
+ g:"Track my conversations across messaging apps and email, map my relationships and tell me who to follow up with.",
+ a:"Python backend (communication tracker, relationship map, life dashboard and alerts), a Node WhatsApp bridge with Gemini, Firebase sync, Docker, and tiered AI sync (a small model every 30 minutes, larger ones on demand).",
+ r:[],
+ l:[]},
+{c:"agents",n:"Browser Pilot",t:"Drive a real Chrome window in plain language",h:"",
+ s:"prototype",
+ g:"Control a real, visible Chrome window with plain-language instructions, for example searching job sites.",
+ a:"Node Express + WebSocket chat UI driving headed Playwright, with GPT-4.1-mini choosing each action.",
+ r:[], l:[]},
+{c:"products",n:"Case Interview Coach (CasePreper)",t:"Consulting case prep in one app",h:"",
+ s:"live",
+ g:"Consulting case-interview preparation: frameworks, drills, a case generator, firm research and application tracking.",
+ a:"Static web app with Firebase Google sign-in and per-user storage, deployed through GitHub Pages.",
+ r:[], l:[["Open","/CasePreper/"]]},
+{c:"products",n:"Therapist Matchmaker (MindMatch)",t:"AI chat that matches patients with psychologists",h:"€300 prototype grant won",
+ s:"prototype",
+ g:"Match patients with psychologists in Lisbon through an AI conversation instead of endless directories.",
+ a:"Clickable PWA prototype (13 screens) with a simulated AI-matching chat and a waitlist wired to Google Sheets through Apps Script; full product, architecture and go-to-market docs.",
+ r:["Won €300 from Nova SBE's ERA Chair Prototyping Fund"], l:[["Open","/mindmatch/"]]},
+{c:"jobalfred",n:"Sourced Investor Deck",t:"Pre-seed deck where every number carries a source",h:"",s:"live",
+ g:"Keep the investor deck honest and current in English and Portuguese, on the web and as PDF.",
+ a:"Python renderer with a sources table turned into footnotes, a Portuguese translation file and a print layout exported to a 16:9 PDF.",
+ r:[],
+ l:[]},
+{c:"agents",n:"Speaker Outreach Drafter",t:"Drafts personal LinkedIn notes, never sends",h:"",s:"live",
+ g:"Each day, prepare up to three personalised messages for AI speaking slots and leave them as drafts for review.",
+ a:"Codex heartbeat automation working from a queue of eligible recipients; it writes drafts in LinkedIn's composer, checks they saved, and never clicks Send.",
+ r:[],
+ l:[]},
+{c:"agents",n:"Startup Application Prep Agent",t:"Prepares one startup application a day",h:"",s:"live",
+ g:"Every day, pick one strategy or operations role at a Y Combinator company and prepare the application for my review.",
+ a:"Codex heartbeat automation driving my signed-in Work at a Startup account in a browser.",
+ r:[],
+ l:[]},
+{c:"agents",n:"ChatGPT Todo Bridge",t:"Tell ChatGPT a task, it lands in my notes app",h:"",s:"prototype",
+ g:"Manage the to-do list in Floating Notes by talking to ChatGPT.",
+ a:"Custom GPT action calling an n8n webhook with API-key auth; its code node edits the to-do tab in the GitHub Gist the notes app syncs from.",
+ r:[],
+ l:[]},
+{c:"products",n:"MBA Admissions Coach",t:"Affordable AI coach for MBA applications",h:"",
+ s:"prototype",
+ g:"An affordable AI admissions coach for international MBA applicants priced out of human consultants.",
+ a:"Python FastAPI backend with a retrieval-based coaching engine over a schools and coaching knowledge base, static front end, Render/Railway deploy configs.",
+ r:[], l:[]},
+{c:"products",n:"Vibe Coding Book",t:"A book on building with AI, in PT and EN",h:"",s:"prototype",
+ g:"Teach non-programmers to build and ship with AI in three progressive parts.",
+ a:"Markdown chapters compiled with Python build scripts and Typst into Portuguese and English PDFs (A4 and A5), with HTML covers.",
+ r:[],
+ l:[]},
+{c:"data",n:"Revolut Business Atlas",t:"Interactive map of Revolut Business",h:"",
+ s:"live",
+ g:"An independent interactive map of Revolut Business plans, products, workflows and the business pains each one solves (EN/PT).",
+ a:"Static JS-rendered SVG diagram with clickable categories and workflow panels.",
+ r:[], l:[["Open","https://tomasbb0-revolut-business-map.netlify.app/"]]},
+{c:"products",n:"Sleep Diary (Diário de Sono)",t:"Phone app that replaces a paper sleep diary",h:"",
+ s:"live",
+ g:"A phone app that replaces a psychologist's paper sleep diary, so patients log every morning and export it.",
+ a:"Installable PWA with Firebase Auth and Firestore, daily unlock at 4:30, streaks, and a Python .docx export.",
+ r:[], l:[["Open","/sleep-diary/"]]},
+{c:"tools",n:"Leak-proof Site Toolchain",t:"Ship pages fast without leaking data",h:"",
+ s:"live",
+ g:"Ship pages fast without leaking data.",
+ a:"Python scripts that encrypt private datasets into static pages, sanitise a live n8n export into a public demo (and assert no emails or sheet IDs remain), build slide decks and brand assets, and check links.",
+ r:[], l:[]},
+{c:"tools",n:"Outbound Engine (Pairwire)",t:"Cold-email engine inside Google Sheets",h:"",
+ s:"archived",
+ g:"Run Pairwire's outbound from Google Sheets.",
+ a:"Google Apps Script: a cold-email sender with timing filters and open/click tracking, a campaign launcher that clones a template sheet per campaign, and an in-Sheets AI code editor.",
+ r:[], l:[]},
+{c:"tools",n:"CV Library",t:"One-page CVs tailored per company, from HTML",h:"",s:"live",
+ g:"Keep one generic and many tailored CVs and cover letters, all rendered the same way.",
+ a:"Folder per target type and company, HTML sources rendered to PDF with headless Chrome under fixed layout rules.",
+ r:[],
+ l:[]},
+{c:"tools",n:"Chat History Rescuer",t:"Recovered hundreds of lost AI chat sessions",h:"563 sessions restored",s:"archived",
+ g:"Restore VS Code AI chat history that disappeared after projects were moved.",
+ a:"Python scripts that audit workspace storage, rebuild workspace-to-session mappings, dedupe and rewrite VS Code's state database.",
+ r:["563 chat sessions mapped back across 36 workspaces"],
+ l:[]},
+{c:"tools",n:"Browser Automation Kit",t:"Gives a coding agent a live Chrome to drive",h:"",s:"archived",
+ g:"Let a coding agent navigate, click, fill forms and read a real Chrome in any VS Code workspace.",
+ a:"Drop-in MCP and toolset configs over the Chrome DevTools Protocol, a setup script, browser-use scripts and recorded learnings.",
+ r:[],
+ l:[]},
+{c:"agents",n:"Credit Application Agent",t:"Fills a cloud-credit application in my own browser",h:"",s:"archived",
+ g:"Fill the AWS Activate credit request using only real, provided facts.",
+ a:"Python Playwright agent attached over CDP to an already signed-in Chrome, with inspect and fill modes and no credential handling.",
+ r:[],
+ l:[]},
+{c:"tools",n:"Halo Tower World Generator",t:"Builds whole Minecraft worlds from code",h:"",s:"live",
+ g:"Build and rebuild the Halo Tower Minecraft worlds (tower, terrain, tunnels, working piston doors) from scripts.",
+ a:"Python generators writing region files directly: tower, terrain and valley, tunnels and a glass halo, with piston-door designs tested on a small flat-world server.",
+ r:[],
+ l:[]},
+{c:"products",n:"Tia Pitucha · ChatGPT persona",t:"Comedy ChatGPT persona: a posh Lisbon aunt",h:"",
+ s:"live",
+ g:"A comedy persona for ChatGPT: a posh Lisbon aunt who answers in theatrical European Portuguese.",
+ a:"Custom GPT with its own website, support, privacy and terms pages for the store listing.",
+ r:[], l:[["Open","/tia-pitucha/"]]},
+{c:"products",n:"Home Concert Club (EmCasa)",t:"Monthly home concerts with QR check-in",h:"",
+ s:"live",
+ g:"Home concerts in Lisbon: one house, one artist, one night a month.",
+ a:"Static landing page plus a QR ticket check-in scanner with manual code entry.",
+ r:[], l:[["Open","/emcasa/"]]},
+{c:"tools",n:"Brand Name Finder",t:"Generates names and checks domains live",h:"",s:"archived",
+ g:"Find short brandable names whose .com, .ai and .pt domains are free.",
+ a:"Python generators (word lists, combinations, compounds, embeddings), Verisign RDAP checks for .com and DNS-over-HTTPS checks for .ai and .pt, rendered into a browsable name pool.",
+ r:[],
+ l:[]},
+{c:"tools",n:"Domain Redirect Network",t:"Every spare domain leads to the right site",h:"8 redirects + 1 mirror",s:"live",
+ g:"Point every BytArc and older brand domain at the right live site after the rename.",
+ a:"8 GitHub Pages redirect repos plus a Portuguese mirror site.",
+ r:["8 redirect repos and 1 mirror site"],
+ l:[["Mirror code","https://github.com/tomasbb0/bytarc-pt"]]},
+{c:"tools",n:"Free Cloud Server Grabber",t:"Claims the full free ARM server allowance",h:"",s:"archived",
+ g:"Automatically create Oracle Cloud's Always-Free ARM servers, which are usually out of capacity.",
+ a:"Script that keeps retrying VM creation until the 4 OCPU / 24 GB free allowance is claimed.",
+ r:[],
+ l:[]},
+{c:"tools",n:"Memory Swiper",t:"Swipe to free memory on a Mac",h:"",
+ s:"archived",
+ g:"Free memory on a Mac by swiping through suggestions of what to close.",
+ a:"Python menu-bar app (rumps, psutil, pyobjc) with local AI tips from Ollama.",
+ r:[], l:[]},
+{c:"tools",n:"Project Launcher",t:"Open any project from one visual launcher",h:"",
+ s:"archived",
+ g:"Pick and open any local project in VS Code from one visual launcher.",
+ a:"Electron app reading VS Code's recent-projects database.",
+ r:[], l:[]}
+];
+const $=s=>document.querySelector(s);
+const esc=t=>String(t).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const slug=t=>t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+const pad=n=>String(n).padStart(2,"0");
+S.forEach((x,i)=>{x.rank=i+1;x.id=slug(x.n)});
+const AREAS={};CATS.forEach(([k,name,sub])=>AREAS[k]={k,name,sub});
+AREAS.top={k:"top",name:"Top 10",sub:"My biggest builds, ranked by time spent and impact"};
+const ORDER=["top",...CATS.map(c=>c[0])];
+const items=k=>k==="top"?S.slice(0,10):S.filter(x=>x.c===k);
+const STATUS={live:"Live",prototype:"Prototype","pre-launch":"Pre-launch",archived:"Archived"};
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const mobile=()=>innerWidth<700;
+const LIVE=S.filter(x=>x.s==="live").length;
+$("#sub").innerHTML=`<b>${S.length}</b> systems · <b>${LIVE}</b> live · <b>${CATS.length}</b> areas. Pick an area, or the core for my top 10.`;
+const hash=(a,b,s=0)=>{let h=(Math.imul(a|0,374761393)+Math.imul(b|0,668265263)+Math.imul(s|0,2246822519))|0;h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296};
+const pxIcon=(bits,u)=>{let r="";bits.forEach((row,j)=>[...row].forEach((ch,i)=>{if(ch!==".")r+=`<rect x="${i}" y="${j}" width=".88" height=".88" fill="${ch==="#"?"#fff":"#8a8a92"}"/>`}));return `<svg class="px" viewBox="0 0 ${bits[0].length} ${bits.length}" width="${bits[0].length*u}" height="${bits.length*u}" aria-hidden="true">${r}</svg>`};
+
+/* ---------- map: hit areas and labels in HTML, pixels on the canvas ---------- */
+const stage=$("#stage");
+let hover=-2,M=null;
+const coreEl=document.createElement("button");coreEl.id="core";coreEl.setAttribute("aria-label","Open my top 10 systems");
+coreEl.innerHTML=`<span class="hit"></span><span class="tag">systems</span><span class="lbl"><strong>Start with my top 10 →</strong></span>`;
+coreEl.onclick=()=>go("top");coreEl.onmouseenter=()=>hover=-1;coreEl.onmouseleave=()=>hover=-2;
+stage.appendChild(coreEl);
+const nodeEls=CATS.map(([k,name,sub],i)=>{
+ const xs=items(k),live=xs.filter(x=>x.s==="live").length;
+ const b=document.createElement("button");b.className="node";
+ b.setAttribute("aria-label",`${name}: ${xs.length} systems, ${live} live`);
+ b.innerHTML=`<span class="hit"></span><span class="lbl"><strong>${esc(name)}</strong><em>${xs.length} systems · ${live} live</em></span>`;
+ b.onclick=()=>go(k);b.onmouseenter=b.onfocus=()=>hover=i;b.onmouseleave=b.onblur=()=>hover=-2;
+ stage.appendChild(b);return b;
+});
+function bres(c0,r0,c1,r1){const out=[];let dx=Math.abs(c1-c0),dy=-Math.abs(r1-r0),sx=c0<c1?1:-1,sy=r0<r1?1:-1,e=dx+dy;
+ for(;;){out.push([c0,r0]);if(c0===c1&&r0===r1)break;const e2=2*e;if(e2>=dy){e+=dy;c0+=sx}if(e2<=dx){e+=dx;r0+=sy}}return out}
+function perim(c,r,hw,hh){const p=[];for(let i=-hw;i<hw;i++)p.push([c+i,r-hh]);for(let j=-hh;j<hh;j++)p.push([c+hw,r+j]);for(let i=hw;i>-hw;i--)p.push([c+i,r+hh]);for(let j=hh;j>-hh;j--)p.push([c-hw,r+j]);return p}
+function layout(){
+ const sr=stage.getBoundingClientRect();if(!sr.width||!sr.height)return;
+ const m=mobile(),cs=m?6:12,cell=v=>Math.floor(v/cs);
+ const cx=sr.left+sr.width/2,cy=sr.top+sr.height/2;
+ const rx=m?sr.width*.335:Math.min(sr.width*.34,440),ry=m?sr.height*.36:Math.min(sr.height*.33,250);
+ const digits=String(S.length),nd=digits.length,hw=Math.ceil((nd*4-1)/2)+2,hh=5;
+ const core={c:cell(cx),r:cell(cy),hw,hh,digits};
+ core.ring=perim(core.c,core.r,hw,hh);
+ const nodes=CATS.map(([k],i)=>{const a=(-90+i*60)*Math.PI/180;
+  const n={k,i,c:cell(cx+rx*Math.cos(a)),r:cell(cy+ry*Math.sin(a)-(m?10:14)),xs:items(k)};
+  n.ring=perim(n.c,n.r,6,6);
+  n.wire=bres(core.c,core.r,n.c,n.r).filter(([c,r])=>!(Math.abs(c-core.c)<=hw+1&&Math.abs(r-core.r)<=hh+1)&&Math.max(Math.abs(c-n.c),Math.abs(r-n.r))>7);
+  return n});
+ M={cs,core,nodes};
+ const mid=v=>v*cs+cs/2;
+ nodeEls.forEach((el,i)=>{const n=nodes[i];el.style.left=(mid(n.c)-sr.left)+"px";el.style.top=(mid(n.r)-sr.top)+"px";el.style.setProperty("--d",13*cs+"px")});
+ coreEl.style.left=(mid(core.c)-sr.left)+"px";coreEl.style.top=(mid(core.r)-sr.top)+"px";
+ coreEl.style.setProperty("--w",(2*hw+1)*cs+"px");coreEl.style.setProperty("--h",(2*hh+1)*cs+"px");coreEl.style.setProperty("--d",(2*hh+1)*cs+"px");coreEl.style.setProperty("--cs",cs+"px");
+}
+
+/* ---------- views ---------- */
+const mapEl=$("#map"),areaEl=$("#area");
+let view="map",mapP=0,mapT=1;
+function swapTo(next){
+ const from=view==="map"?mapEl:areaEl,to=next==="map"?mapEl:areaEl;
+ if(from===to)return;
+ from.classList.add("leave");
+ to.hidden=false;to.classList.add("enter");void to.offsetWidth;
+ requestAnimationFrame(()=>to.classList.remove("enter"));
+ setTimeout(()=>{from.hidden=true;from.classList.remove("leave")},reduce?0:520);
+ view=next==="map"?"map":"area";mapT=view==="map"?1:0;
+}
+
+/* ---------- ring ---------- */
+const scene=$("#scene"),ring=$("#ring");
+let curK=null,xs=[],n=0,wrap=true,step=40,R=400,cw=296,ch=372,cards=[];
+let pos=0,tpos=0,zoom=1,dragging=false,moved=0,detailIdx=-1,frontShown=-1;
+function glyph(x){
+ let s=7;for(const c of x.n)s=(Math.imul(s,31)+c.charCodeAt(0))>>>0;
+ const r=()=>(s=(Math.imul(s,1664525)+1013904223)>>>0)/4294967296;
+ const W=17,H=6;let out="";
+ for(let j=0;j<H;j++)for(let i=0;i<9;i++){const v=r();if(v>.46)continue;
+  const f=v<.17?"#fff":v<.32?"#b9b9c0":"#6f6f77",tw=r()<.4?` class="tw" style="animation-delay:${(r()*2.4).toFixed(2)}s"`:"";
+  out+=`<rect x="${i}" y="${j}" width=".86" height=".86" fill="${f}"${tw}/>`;if(i<8)out+=`<rect x="${W-1-i}" y="${j}" width=".86" height=".86" fill="${f}"${tw}/>`}
+ return `<svg class="gl px" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMinYMid meet" aria-hidden="true">${out}</svg>`;
+}
+function cardHTML(x,i){
+ return `<div class="card" data-i="${i}" role="button" aria-label="${esc(x.n)}"><div class="ctop"><span class="rk">${pxIcon(ICONS[x.c],1.45)}#${pad(x.rank)}</span><span class="st ${x.s}">${STATUS[x.s]}</span></div>${glyph(x)}<h3>${esc(x.n)}</h3><p>${esc(x.t)}</p><div class="hero">${esc(x.h||"")}</div><div class="open">${mobile()?"Tap":"Click"} for details →</div></div>`;
+}
+function geometry(){
+ const m=mobile();cw=m?Math.min(226,innerWidth-110):296;ch=m?300:372;
+ const sh=scene.clientHeight;if(sh&&sh<ch+40)ch=Math.max(250,sh-40);
+ step=wrap?360/n:36;
+ R=Math.round(cw/2/Math.tan(step*Math.PI/360))+(m?22:44);
+ scene.style.setProperty("--cw",cw+"px");scene.style.setProperty("--ch",ch+"px");
+ cards.forEach((c,i)=>c.style.transform=`rotateY(${i*step}deg) translateZ(${R}px)`);
+}
+function buildRing(k){
+ xs=items(k);n=xs.length;wrap=n>=5;
+ ring.innerHTML=xs.map(cardHTML).join("");
+ cards=[...ring.children];
+ cards.forEach((c,i)=>c.addEventListener("click",()=>{if(moved>6)return;stopAuto();i===frontIdx()?openItem(i):goTo(i)}));
+ geometry();
+ $("#dots").innerHTML=xs.map(x=>`<button aria-label="${esc(x.n)}"></button>`).join("");
+ [...$("#dots").children].forEach((b,i)=>b.onclick=()=>{stopAuto();goTo(i)});
+ tpos=0;pos=reduce?0:(wrap?-2.6:-1.6);zoom=reduce?1:0;frontShown=-1;
+ startAuto();
+}
+const clampI=i=>Math.max(0,Math.min(n-1,i));
+function frontIdx(){const r=Math.round(tpos);return wrap?((r%n)+n)%n:clampI(r)}
+function goTo(i){if(wrap){const b=Math.round(tpos);let d=(((i-b)%n)+n)%n;if(d>n/2)d-=n;tpos=b+d}else tpos=clampI(i)}
+function nudge(d){stopAuto();tpos=wrap?Math.round(tpos)+d:clampI(Math.round(tpos)+d)}
+let autoT=null,touched=false;
+function startAuto(){clearInterval(autoT);if(reduce||touched||!wrap)return;autoT=setInterval(()=>{if(detailIdx<0&&!dragging&&view==="area")tpos=Math.round(tpos)+1},3600)}
+function stopAuto(){touched=true;clearInterval(autoT)}
+
+let sx=0,sp=0,ptr=null;
+scene.addEventListener("pointerdown",e=>{if(e.button)return;dragging=true;moved=0;sx=e.clientX;sp=pos;tpos=pos;scene.classList.add("drag")});
+addEventListener("pointermove",e=>{
+ ptr=[e.clientX,e.clientY];tiltT=[e.clientX/innerWidth-.5,e.clientY/innerHeight-.5];
+ if(!dragging)return;const dx=e.clientX-sx;moved=Math.max(moved,Math.abs(dx));
+ if(moved>6)stopAuto();
+ let p=sp-dx/(cw*1.05);if(!wrap)p=Math.max(-.4,Math.min(n-.6,p));pos=tpos=p;
+});
+document.addEventListener("pointerleave",()=>ptr=null);
+const endDrag=()=>{if(!dragging)return;dragging=false;scene.classList.remove("drag");tpos=wrap?Math.round(tpos):clampI(Math.round(tpos))};
+addEventListener("pointerup",endDrag);addEventListener("pointercancel",endDrag);
+let wacc=0,wlast=0;
+scene.addEventListener("wheel",e=>{e.preventDefault();const d=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;wacc+=d;
+ if(Math.abs(wacc)>45&&Date.now()-wlast>240){nudge(Math.sign(wacc));wacc=0;wlast=Date.now()}},{passive:false});
+$("#prev").onclick=()=>nudge(-1);$("#next").onclick=()=>nudge(1);
+
+/* ---------- area chrome ---------- */
+function renderHead(){
+ const a=AREAS[curK],live=xs.filter(x=>x.s==="live").length;
+ $("#aicon").innerHTML=pxIcon(ICONS[curK],mobile()?3.4:4.4);
+ $("#ameta").textContent=`${pad(n)} systems · ${pad(live)} live`;
+ $("#atitle").textContent=a.name;$("#asub").textContent=a.sub;
+ $("#tabs").innerHTML=ORDER.map(k=>`<button class="pbtn" data-k="${k}" aria-pressed="${k===curK}">${pxIcon(ICONS[k],1.45)}${esc(AREAS[k].name)}</button>`).join("");
+ [...$("#tabs").children].forEach(b=>b.onclick=()=>{location.hash=b.dataset.k});
+ const act=$("#tabs").querySelector('[aria-pressed="true"]');if(act)act.scrollIntoView({block:"nearest",inline:"center"});
+ $("#hint").textContent=mobile()?"Swipe to spin · tap the front card":"Drag, scroll or use ← → · click the front card";
+}
+function renderCrumb(){
+ $("#crumb").innerHTML=`<span>/</span><button id="cmap">systems</button>${curK?`<span>/</span><b>${esc(AREAS[curK].name)}</b>`:""}`;
+ $("#cmap").onclick=toMap;
+}
+
+/* ---------- detail ---------- */
+const panel=$("#detail"),scrim=$("#scrim");
+function showDetail(i){
+ const x=xs[i],a=AREAS[x.c];detailIdx=i;
+ $("#dcat").innerHTML=`${pxIcon(ICONS[x.c],1.6)}${esc(a.name)}`;
+ const links=x.l.length?x.l.map(([t,u])=>`<a href="${esc(u)}"${u.startsWith("http")?' target="_blank" rel="noopener"':""}>${esc(t)} ↗</a>`).join(""):`<span>Private · walkthrough on request</span>`;
+ $("#dbody").innerHTML=`<div class="drank">#${pad(x.rank)} of ${S.length} systems</div><h2>${esc(x.n)}</h2><p class="dtag">${esc(x.t)}</p>
+<div class="dmeta"><span class="st ${x.s}">${STATUS[x.s]}</span>${x.h?`<span class="dhero">${esc(x.h)}</span>`:""}</div>
+<section><h4>goal</h4><p>${esc(x.g)}</p></section>
+<section><h4>how it's built</h4><p>${esc(x.a)}</p></section>
+${x.r.length?`<section><h4>results</h4><ul>${x.r.map(r=>`<li>${esc(r)}</li>`).join("")}</ul></section>`:""}
+<div class="dlinks">${links}</div>
+<p class="dnote">Results list only numbers I can show from the systems themselves. Client systems are described without the client's name.</p>`;
+ $("#dbody").scrollTop=0;
+ $("#dpos").textContent=`${pad(i+1)} / ${pad(n)}`;
+ $("#dprev").style.visibility=wrap||i>0?"visible":"hidden";
+ $("#dnext").style.visibility=wrap||i<n-1?"visible":"hidden";
+ panel.classList.add("show");panel.setAttribute("aria-hidden","false");scrim.classList.add("on");stopAuto();
+}
+function hideDetail(){panel.classList.remove("show");panel.setAttribute("aria-hidden","true");scrim.classList.remove("on");detailIdx=-1}
+function openItem(i){location.hash=`${curK}/${xs[i].id}`}
+function closeDetail(){history.replaceState(null,"","#"+curK);hideDetail()}
+function stepDetail(d){let i=detailIdx+d;if(wrap)i=(i+n)%n;else if(i<0||i>=n)return;goTo(i);history.replaceState(null,"",`#${curK}/${xs[i].id}`);showDetail(i)}
+$("#dclose").onclick=closeDetail;scrim.onclick=closeDetail;
+$("#dprev").onclick=()=>stepDetail(-1);$("#dnext").onclick=()=>stepDetail(1);
+
+/* ---------- routing ---------- */
+function go(k){location.hash=k}
+function toMap(){history.pushState(null,"",location.pathname+location.search);route()}
+$("#back").onclick=toMap;
+function route(){
+ const [k,id]=decodeURIComponent(location.hash.slice(1)).split("/");
+ if(!AREAS[k]){
+  hideDetail();
+  if(view!=="map"){swapTo("map");requestAnimationFrame(layout)}
+  curK=null;renderCrumb();clearInterval(autoT);return;
+ }
+ if(curK!==k){
+  if(view==="map")swapTo("area");
+  curK=k;
+  requestAnimationFrame(()=>{buildRing(k);renderHead();if(id)openFromId(id)});
+  renderCrumb();
+  if(!id)hideDetail();
+  return;
+ }
+ if(id)openFromId(id);else hideDetail();
+}
+function openFromId(id){const i=xs.findIndex(x=>x.id===id);if(i<0){hideDetail();return}goTo(i);if(zoom<1)pos=tpos;showDetail(i)}
+addEventListener("hashchange",route);
+
+addEventListener("keydown",e=>{
+ if(e.key==="Escape"){if(detailIdx>=0)closeDetail();else if(view==="area")toMap();return}
+ if(view!=="area")return;
+ if(e.key==="ArrowRight"||e.key==="ArrowLeft"){const d=e.key==="ArrowRight"?1:-1;detailIdx>=0?stepDetail(d):nudge(d);e.preventDefault()}
+ if(e.key==="Enter"&&detailIdx<0&&!(document.activeElement&&document.activeElement.matches("button,a"))){openItem(frontIdx())}
+});
+let rz;addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{sizeBg();if(view==="map")layout();else{geometry();renderHead()}},120)});
+
+/* ---------- the pixel field: grid, black band dripping from the top, a band rising at the bottom, odd cells,
+   the pointer's trail, and the map itself ---------- */
+const G=12,BAND=4,DRIP=9,FBAND=2,FDRIP=5;
+const SQ=["#000000","#08080a","#131316"],ACC="#3e3e45";
+const cv=$("#bg"),g=cv.getContext("2d");let W=0,H=0,dpr=1,cols=0,rows=0,gridImg=null;
+function sizeBg(){
+ dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);cv.style.width=W+"px";cv.style.height=H+"px";
+ cols=Math.ceil(W/G)+1;rows=Math.ceil(H/G)+1;
+ gridImg=document.createElement("canvas");gridImg.width=cv.width;gridImg.height=cv.height;
+ const x=gridImg.getContext("2d");x.scale(dpr,dpr);x.fillStyle="#28282d";x.fillRect(0,0,W,H);x.fillStyle="#313137";
+ for(let c=0;c<=cols;c++)x.fillRect(c*G,0,1,H);for(let r=0;r<=rows;r++)x.fillRect(0,r*G,W,1);
+}
+const noise=x=>{const i=Math.floor(x),f=x-i,u=f*f*(3-2*f);return hash(i,0,11)*(1-u)+hash(i+1,0,11)*u};
+const slot=(c,r,t,sp)=>Math.floor(t*sp+hash(c,r,3)*9);
+const trail=new Map();
+let Q={};
+const put=(fill,x,y,s)=>{(Q[fill]||(Q[fill]=[])).push(x,y,s)};
+const grey=v=>{v=Math.max(0,Math.min(255,Math.round(v/8)*8));return `rgb(${v},${v},${Math.min(255,v+3)})`};
+function flush(){for(const f in Q){g.fillStyle=f;const a=Q[f];for(let i=0;i<a.length;i+=3)g.fillRect(a[i]+1,a[i+1]+1,a[i+2]-1,a[i+2]-1)}Q={}}
+function drawField(t){
+ for(let c=0;c<cols;c++){
+  const d=BAND+Math.floor(DRIP*Math.pow(noise(c/7+t*.035),2.4))+(hash(c,1,5)<.1?2:0);
+  for(let r=0;r<d;r++){
+   if(r>=BAND-1&&hash(c,r,slot(c,r,t,.2))<.22)continue;
+   const h=hash(c,r,slot(c,r,t,.12));put(h<.025?ACC:SQ[Math.floor(h*3)],c*G,r*G,G);
+  }
+  const b=FBAND+Math.floor(FDRIP*Math.pow(noise(c/8+40-t*.03),2.4));
+  for(let k=0;k<b;k++){const r=rows-2-k;if(k>=FBAND-1&&hash(c,r,slot(c,r,t,.2))<.22)continue;const h=hash(c,r,slot(c,r,t,.12));put(SQ[Math.floor(h*3)],c*G,r*G,G)}
+ }
+ for(let i=0;i<18;i++){const per=6+hash(i,2,9)*6,cyc=Math.floor(t/per+hash(i,3,9)),ph=(t/per+hash(i,3,9))%1;
+  const c=Math.floor(hash(i,cyc,4)*cols),r=BAND+3+Math.floor(hash(i,cyc,6)*(rows-BAND-6));
+  put(grey(40+30*Math.sin(ph*Math.PI)),c*G,r*G,G)}
+ if(ptr&&!dragging){const c=Math.floor(ptr[0]/G),r=Math.floor(ptr[1]/G);trail.set(c+","+r,1)}
+ for(const [k,v] of trail){const [c,r]=k.split(",").map(Number);put(grey(48+150*v),c*G,r*G,G);const nv=v*.9;nv<.05?trail.delete(k):trail.set(k,nv)}
+}
+function drawMap(t){
+ if(!M||mapP<=0)return;
+ const {cs,core,nodes}=M;
+ const px=(c,r,L,salt=1)=>{const h=hash(c,r,salt);const lp=Math.min(1,Math.max(0,(mapP-h*.7)/.3));if(lp<=0)return;put(grey(52+(L-52)*Math.pow(lp,1.6)),c*cs,r*cs,cs)};
+ nodes.forEach(nd=>{
+  const hot=hover===nd.i,len=nd.wire.length;
+  nd.wire.forEach(([c,r],j)=>{if(j%2===0)px(c,r,hot?150:84,7)});
+  if(!reduce){const p=Math.floor((t*11+nd.i*9)%(len+8));[0,1,2].forEach(k=>{const j=p-k;if(j>=0&&j<len)px(nd.wire[j][0],nd.wire[j][1],[250,180,120][k],7)})}
+  ICONS[nd.k].forEach((row,j)=>[...row].forEach((ch,i)=>{if(ch!==".")px(nd.c-4+i,nd.r-4+j,ch==="#"?(hot?255:236):(hot?190:140),2)}));
+  const P=nd.ring,N=nd.xs.length,off=reduce?0:Math.floor(t*2.4+nd.i*5)%P.length,taken=new Set();
+  nd.xs.forEach((x,k)=>{const q=(Math.round(k*P.length/N)+off)%P.length;taken.add(q);px(P[q][0],P[q][1],x.s==="live"?250:122,3)});
+  P.forEach(([c,r],q)=>{if(!taken.has(q)&&(hot||q%2===0))px(c,r,hot?96:62,3)});
+ });
+ const hot=hover===-1,nd=core.digits.length,c0=core.c-Math.floor((nd*4-1)/2);
+ [...core.digits].forEach((dg,di)=>DIGITS[dg].forEach((row,j)=>[...row].forEach((ch,i)=>{if(ch==="#")px(c0+di*4+i,core.r-4+j,250,4)})));
+ const P=core.ring,run=reduce?-99:Math.floor(t*9)%P.length;
+ P.forEach(([c,r],q)=>{let d=(run-q+P.length)%P.length;const L=d<6?250-d*28:(hot?150:(q%2?0:76));if(L)px(c,r,L,5)});
+ [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([a,b])=>px(core.c+a*core.hw,core.r+b*core.hh,236,5));
+}
+sizeBg();
+
+/* ---------- main loop ---------- */
+let tilt=[0,0],tiltT=[0,0],t0=performance.now(),last=t0;
+function frame(now){
+ const t=(now-t0)/1000,dt=Math.min(.3,(now-last)/1000);last=now;
+ mapP+=Math.sign(mapT-mapP)*Math.min(Math.abs(mapT-mapP),dt/(mapT?0.9:0.55));
+ tilt[0]+=(tiltT[0]-tilt[0])*.06;tilt[1]+=(tiltT[1]-tilt[1])*.06;
+ if(view==="area"&&n){
+  if(!dragging){pos+=(tpos-pos)*(reduce?1:.09);if(Math.abs(tpos-pos)<.0005)pos=tpos}
+  zoom+=(1-zoom)*.06;if(zoom>.999)zoom=1;
+  const ez=1-Math.pow(1-zoom,2);
+  ring.style.transform=`translateZ(${(-R-(1-ez)*1600).toFixed(1)}px) rotateX(${(-6-tilt[1]*6).toFixed(2)}deg) rotateY(${(-pos*step+tilt[0]*8).toFixed(2)}deg)`;
+  for(let i=0;i<n;i++){
+   let d=i-pos;if(wrap){d=((d%n)+n)%n;if(d>n/2)d-=n}
+   const ang=Math.abs(d*step),c=cards[i];
+   c.style.opacity=(ang>100?0:Math.max(.16,1-ang/105)*Math.min(1,ez*1.4)).toFixed(3);
+   c.style.pointerEvents=ang>90?"none":"auto";
+   c.classList.toggle("front",Math.abs(d)<.5);
+  }
+  const f=frontIdx();
+  if(f!==frontShown){frontShown=f;[...$("#dots").children].forEach((b,i)=>b.classList.toggle("on",i===f))}
+ }
+ g.setTransform(dpr,0,0,dpr,0,0);g.drawImage(gridImg,0,0,W,H);
+ drawField(reduce?0:t);flush();drawMap(t);flush();
+ requestAnimationFrame(frame);
+}
+renderCrumb();
+requestAnimationFrame(()=>{layout();route();requestAnimationFrame(frame)});
+</script>
+</body>
+</html>
